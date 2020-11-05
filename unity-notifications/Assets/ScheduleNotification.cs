@@ -11,14 +11,10 @@ public class ScheduleNotification : MonoBehaviour
 
     void Start()
     {
-        attachmentDir = Application.persistentDataPath + "/Attachments";
-        if (!Directory.Exists (attachmentDir)) {
-            Directory.CreateDirectory (attachmentDir);
-        }
-        
+        StartCoroutine(PrepareImage());
         StartCoroutine(RequestAuthorization());
     }
-
+    
     private void OnApplicationPause(bool pauseStatus)
     {
         iOSNotificationCenter.RemoveAllDeliveredNotifications();
@@ -44,40 +40,41 @@ public class ScheduleNotification : MonoBehaviour
     }
 
     private string attachmentDir;
+    private string imageFile;
 
-    private IEnumerator DownloadImage(string imageUrl, string filePath)
+    private IEnumerator PrepareImage()
     {
-        using (UnityWebRequest www = UnityWebRequest.Get(imageUrl))
+        attachmentDir = Application.persistentDataPath + "/Attachments";
+        if (!Directory.Exists (attachmentDir)) {
+            Directory.CreateDirectory (attachmentDir);
+        }
+
+        imageFile = Path.Combine(attachmentDir,"notification.png");
+        if (!File.Exists(imageFile))
         {
-            yield return www.Send();
-            if (www.isNetworkError || www.isHttpError)
+            string imageUrl = ("https://www.dapperhacks.com/battle-stone.jpg");
+            using (UnityWebRequest www = UnityWebRequest.Get(imageUrl))
             {
-                Debug.LogError("Failed to download image: " + www.error);
-            }
-            else
-            {
-                File.WriteAllBytes(filePath, www.downloadHandler.data);
+                yield return www.Send();
+                if (www.isNetworkError || www.isHttpError)
+                {
+                    Debug.LogError("Failed to download image: " + www.error);
+                }
+                else
+                {
+                    File.WriteAllBytes(imageFile, www.downloadHandler.data);
+                }
             }
         }
     }
+
     
     [DllImport("__Internal")]
     private static extern void _Plugin_ScheduleLocalNotification(string instanceId, string title, string body, string attachmentFile, int timeIntervalSecs);
-    
-    public IEnumerator Schedule()
+
+    public void Schedule()
     {
-        var imageFile = Path.Combine(attachmentDir,"notification.png");
-        if (!File.Exists(imageFile))
-        {
-            yield return DownloadImage("https://www.dapperhacks.com/battle-stone.jpg", imageFile);
-        }
-        
         _Plugin_ScheduleLocalNotification(instanceId: DateTime.Now.ToString("yyyyMMddhhmmss"),title: "Battle Stones Received",body: "You received a 🎁 gift 🎁 of battlestones. Play now to claim!", attachmentFile: imageFile, timeIntervalSecs: 5);
-    }
-    
-    public void OnClick()
-    {
-        StartCoroutine(Schedule());
     }
 
 }
